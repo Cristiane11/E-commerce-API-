@@ -96,13 +96,13 @@ def add_user():
 @app.route("/users", methods=["GET"])
 def get_users():
     users = User.query.all()
-    return users_schema.jsonify(users)
+    return users_schema.jsonify(users),200
 
 
 @app.route("/users/<int:id>", methods=["GET"])
 def get_user(id):
     user = User.query.get_or_404(id)
-    return user_schema.jsonify(user)
+    return user_schema.jsonify(user),200
 
 
 @app.route("/users/<int:id>", methods=["PUT"])
@@ -124,7 +124,7 @@ def delete_user(id):
     return jsonify({"message": "User deleted successfully"}), 200
 
 
-# CRUD for Products
+#  Products Schemas
 product_schema = ProductSchema()
 products_schema = ProductSchema(many=True)
 
@@ -133,9 +133,7 @@ products_schema = ProductSchema(many=True)
 def add_product():
     data = request.json
     new_product = Product(
-        product_name=data["product_name"],
-        price=data["price"],
-    )
+    product_name=data["product_name"], price=data["price"])
     db.session.add(new_product)
     db.session.commit()
     return product_schema.jsonify(new_product), 201
@@ -170,7 +168,62 @@ def delete_product(id):
     db.session.commit()
     return jsonify({"message": "Product deleted successfully"}), 200
 
+# Order Schemas
+order_schema = OrderSchema()
+orders_schema = OrderSchema(many=True)
 
+@app.route("/orders", methods=["POST"])
+def add_order():
+    data = request.json
+    user_id = data.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    new_order = Order(user_id=data["user_id"])
+    db.session.add(new_order)
+    db.session.commit()
+    return order_schema.jsonify(new_order), 201
+
+@app.route("/orders/user/<int:user_id>", methods=["GET"])
+def get_orders(user_id):
+    orders = Order.query.filter_by(user_id = user_id).all()
+    return orders_schema.jsonify(orders), 200
+
+@app.route("/orders/<int:order_id>/products", methods=["GET"])
+def get_order_products(order_id):
+    order = Order.query.get_or_404(order_id)
+    return products_schema.jsonify(order.products), 200
+
+
+@app.route("/order/<int:id>", methods=["PUT"])
+def update_order(id):
+    order = Order.query.get_or_404(id)
+    data = request.json                         
+    db.session.commit(order)
+    return product_schema.jsonify(update_order), 200
+
+# DELETE The entire Order
+# @app.route("/order/<int:id>", methods=["DELETE"])
+# def remove_order(id):
+#     order = Order.query.get_or_404(id)
+#     db.session.delete(order)
+#     db.session.commit()
+#     return jsonify({"message": "Product deleted successfully"}), 200
+
+@app.route("/orders/<int:order_id>/remove_product/<int:product_id>", methods=["DELETE"])
+def remove_product_from_order(order_id, product_id):
+    order = Order.query.get_or_404(order_id)
+    product = Product.query.get_or_404(product_id)
+
+    if product not in order.products:
+        return jsonify({"message": "Product not found in order"}), 404
+
+    order.products.remove(product)
+    db.session.commit()
+    return jsonify({"message": "Product removed from order"}), 200
+    
 # Initialize
 if __name__ == "__main__":
     with app.app_context():
